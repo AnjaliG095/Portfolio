@@ -1,3 +1,4 @@
+
 import {
   createContext,
   useCallback,
@@ -16,27 +17,53 @@ type RouterCtx = {
 
 const Ctx = createContext<RouterCtx | null>(null);
 
+const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 function normalize(path: string) {
   if (!path) return "/";
-  const noQuery = path.split("?")[0].split("#")[0];
-  if (noQuery.length > 1 && noQuery.endsWith("/")) return noQuery.slice(0, -1);
-  return noQuery || "/";
+
+  let pathname = path.split("?")[0].split("#")[0];
+
+  if (
+    BASE_PATH &&
+    BASE_PATH !== "/" &&
+    (pathname === BASE_PATH || pathname.startsWith(`${BASE_PATH}/`))
+  ) {
+    pathname = pathname.slice(BASE_PATH.length) || "/";
+  }
+
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    pathname = pathname.slice(0, -1);
+  }
+
+  return pathname || "/";
+}
+
+function withBasePath(path: string) {
+  const target = normalize(path);
+  return `${BASE_PATH}${target === "/" ? "/" : target}`;
 }
 
 export function Router({ children }: { children: ReactNode }) {
-  const [path, setPath] = useState(() => normalize(window.location.pathname));
+  const [path, setPath] = useState(() =>
+    normalize(window.location.pathname)
+  );
 
   useEffect(() => {
     const onPop = () => setPath(normalize(window.location.pathname));
+
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const navigate = useCallback((to: string) => {
     const target = normalize(to);
-    if (target !== normalize(window.location.pathname)) {
-      window.history.pushState({}, "", target);
+    const browserPath = withBasePath(target);
+
+    if (browserPath !== window.location.pathname) {
+      window.history.pushState({}, "", browserPath);
     }
+
     setPath(target);
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, []);
@@ -56,13 +83,16 @@ export function useRoutePath() {
   return useRouter().path;
 }
 
-type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { to: string };
+type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  to: string;
+};
 
 export function Link({ to, onClick, children, ...rest }: LinkProps) {
   const { navigate } = useRouter();
+
   return (
     <a
-      href={to}
+      href={withBasePath(to)}
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
@@ -80,8 +110,16 @@ export function Routes({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function Route({ path, element }: { path: string; element: ReactNode }) {
+export function Route({
+  path,
+  element,
+}: {
+  path: string;
+  element: ReactNode;
+}) {
   const current = useRoutePath();
+
   if (normalize(path) !== current) return null;
+
   return <>{element}</>;
 }

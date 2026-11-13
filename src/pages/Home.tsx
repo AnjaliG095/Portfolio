@@ -62,7 +62,7 @@ export default function Home() {
           <div className="relative">
             <div className="relative overflow-hidden rounded-[2rem] shadow-2xl">
               <img
-                src="/img/hero-portrait.png"
+                 src={`${import.meta.env.BASE_URL}img/hero-portrait.png`}
                 alt={`Portrait of ${person.name}`}
                 className="aspect-[2/3] w-full object-cover"
                 loading="eager"
